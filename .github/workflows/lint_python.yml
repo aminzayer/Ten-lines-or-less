@@ -5,15 +5,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-python@v3
-      - run: pip install bandit black codespell flake8 isort mypy pytest pyupgrade
-      - run: bandit -r . || true
-      - run: black --check . || true
-      - run: codespell --quiet-level=2 || true  # --ignore-words-list="" --skip=""
-      - run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-      - run: isort --check-only --profile black . || true
-      - run: pip install -r requirements.txt || true
-      - run: mypy --ignore-missing-imports . || true
-      - run: pytest . || true
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.x
+      - run: pip install --upgrade pip ruff setuptools wheel
+      - name: "Ruff: Show stopper (must-fix) issues"
+        run: ruff . --select=E9,F63,F7,F82,PLE,YTT --show-source .
+      - name: "Ruff: All issues"
+        run: ruff --exit-zero --select=ALL --statistics --target-version=py37 .
+      - name: "Ruff: All fixable (ruff --fix) issues"
+        run: ruff --exit-zero --select=ALL --ignore=ANN204,COM812,ERA001,RSE102
+                  --statistics --target-version=py37 . || true | grep "\[\*\]"      
+      - run: pip install black codespell mypy pytest safety
+      - run: black --check .
+      - run: codespell --quiet-level=1  # --ignore-words-list="" --skip="*.css,*.js,*.lock"
+      - run: pip install -r requirements.txt || pip install --editable . || pip install . || true
+      - run: mkdir --parents --verbose .mypy_cache
+      - run: mypy --ignore-missing-imports --install-types --non-interactive .
       - run: pytest --doctest-modules . || true
-      - run: shopt -s globstar && pyupgrade --py36-plus **/*.py || true
+      - run: pytest . || true
+      - run: safety check
